@@ -1,5 +1,5 @@
 [package]
-name = "forustm2"
+name = "rulog"
 version = "0.1.0"
 authors = ["Daogang Tang <daogangtang@live.com>"]
 edition = "2018"
@@ -16,6 +16,6 @@ rusoda = {path="../rusoda/"}
 
 
 [[bin]]
-name = "page_portal_bin"
-path = "src/page_portal_bin.rs"
+name = "page_blog_bin"
+path = "src/page_blog_bin.rs"
 
