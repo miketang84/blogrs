@@ -6,13 +6,8 @@
 
 {% block content %}
 <div class="body-content">
-    {% if is_in_blog %}
     <h3>
     {{"edit_blog_article"|i18n}}
-    </h3>
-    {% else %}
-    <h3>
-    {{"edit_article"|i18n}}
     </h3>
     {% endif %}
     {% if is_in_blog %}

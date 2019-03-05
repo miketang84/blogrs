@@ -1,7 +1,7 @@
 
 [title]
-cn = "Rust语言中文社区"
-en = "Rust Language Community"
+cn = "Daogang's Blog"
+en = "Daogang's Blog"
 
 [account]
 cn = "帐户"
@@ -189,7 +189,7 @@ cn = "新建帖子"
 en = "New Article"
 
 [new_blog_post]
-cn = "发表博客"
+cn = "新建文章"
 en = "New blog post"
 
 [new_comment]

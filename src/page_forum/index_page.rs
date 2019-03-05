@@ -32,14 +32,11 @@ impl IndexPage {
         let napp = envconfig::get_int_item("NUMBER_ARTICLE_PER_PAGE");
         let articles = Article::get_latest_articles(napp);
 
-        let blog_articles = Article::get_latest_blog_articles(napp);
-
         // get all configured index displaying sections
         // and latest commented three articles 
         let sections = Section::forum_sections();
 
         web.insert("articles", &articles);
-        web.insert("blog_articles", &blog_articles);
         web.insert("sections", &sections);
 
         res_html!("forum/index.html", web)
@@ -57,12 +54,15 @@ impl IndexPage {
 impl SapperModule for IndexPage {
     fn before(&self, req: &mut Request) -> SapperResult<()> {
         let (path, _) = req.uri();
-        if &path == "/" {
-            if cache::cache_is_valid("index", "index") {
-                let cache_content = cache::cache_get("index", "index");
-                
-                splog(req, status::Ok).unwrap();
-                return res_html_before!(cache_content);
+        // if cache is open, retreive it to display
+        if envconfig::get_int_item("CACHE") == 1 {
+            if &path == "/" {
+                if cache::cache_is_valid("index", "index") {
+                    let cache_content = cache::cache_get("index", "index");
+                    
+                    splog(req, status::Ok).unwrap();
+                    return res_html_before!(cache_content);
+                }
             }
         }
         

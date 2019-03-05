@@ -7,17 +7,16 @@
 {% block content %}
 <div class="body-content">
     <div class="action_area">
-	    <a class="right new-article" href="/p/blogarticle/create">{{"write_blog"|i18n}}</a>
-	    <a class="right new-article" href="/p/article/create">{{"post_article"|i18n}}</a>
+	    <a class="right new-article" href="/p/article/create">{{"write_blog"|i18n}}</a>
         <div style="clear:both;"></div>
     </div>
     
     <div class="article-list-section">
-        <div class="article-list-head head">
+        <!-- <div class="article-list-head head">
 		<span>{{"latest_articles"|i18n}}</span>
-        </div>
+        </div> -->
         {% if articles | length  == 0 %}
-	<p>{{"no_content"|i18n}}</p>
+	    <p>{{"no_content"|i18n}}</p>
         {% else %}
         <div class="article-list-container container article-list">
             <ul>
@@ -28,33 +27,8 @@
                         {{ article.title }}
                     </a>
                     <span class="right">
-                        <span class="author">{{ article.author_name }}</span> 
+                        <!-- <span class="author">{{ article.author_name }}</span>  -->
                         <span class="timestamp ">{{article.created_time | zone8}}</span>
-                    </span>
-                </li>
-            {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
-        <div style="clear:both;"></div>
-    </div>
-
-    <!-- Member Blog Planet Space -->
-    <div class="planet-space-section">
-        <div class="planet-space-head head">
-		<span>{{"blog_planet"|i18n}}</span>
-        </div>
-        {% if blog_articles | length == 0 %}
-	<p>{{"no_content"|i18n}}</p>
-        {% else %}
-        <div class="planet-space-container container article-list">
-            <ul>
-            {% for blog_article in blog_articles %}
-                <li>
-                    <a href="/article?id={{ blog_article.id }}" class="title">{{ blog_article.author_name }}：{{ blog_article.title }}</a>
-                    <span class="right">
-                        <span class="author">{{ blog_article.author_name }}</span> 
-                        <span class="timestamp">{{blog_article.created_time | zone8}}</span>
                     </span>
                 </li>
             {% endfor %}

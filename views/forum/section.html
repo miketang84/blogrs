@@ -9,11 +9,8 @@
     <div class="detail-head">
         <div>
             <h3>{{ section.title }}</h3>
-            {% if is_myown_blog %}
-	    <a class="right new-article" href="/p/blogarticle/create">{{"write_blog"|i18n}}</a>
-            {% else %}
-	    <a class="right new-article" href="/p/article/create?section_id={{section.id}}">{{"post_article"|i18n}}</a>
-            {% endif %}
+	    <a class="right new-article" href="/p/article/create?section_id={{section.id}}">{{"write_blog"|i18n}}</a>
+	    <!-- <a class="right new-article" href="/p/article/create?section_id={{section.id}}">{{"post_article"|i18n}}</a> -->
         </div>
         <p>
             <small>{{ section.description }}</small>
