@@ -7,6 +7,7 @@ use sapper::{
     Module as SapperModule,
     Router as SapperRouter};
 use sapper_std::*;
+use log::info;
 
 use crate::db;
 // introduce macros
@@ -19,6 +20,12 @@ use crate::envconfig;
 use crate::dataservice::article::Article;
 use crate::dataservice::section::Section;
 
+use crate::TtvIndex;
+use crate::tantivy_index::{DocFromIndexOuter, Doc2Index};
+use crate::middleware::{
+    permission_need_be_admin,
+    check_cache_switch
+};
 
 pub struct IndexPage;
 
@@ -26,8 +33,6 @@ impl IndexPage {
 
     pub fn index(req: &mut Request) -> SapperResult<Response> {
         let mut web = ext_type_owned!(req, AppWebContext).unwrap();
-        let db_conn = db::get_db();
-        let redis_conn = db::get_redis();
 
         let napp = envconfig::get_int_item("NUMBER_ARTICLE_PER_PAGE");
         let articles = Article::get_latest_articles(napp);
@@ -48,14 +53,61 @@ impl IndexPage {
         res_xml_string!(rss_string)
     }
 
+    pub fn search_query_page(req: &mut Request) -> SapperResult<Response> {
+        let mut web = ext_type_owned!(req, AppWebContext).unwrap();
+
+        let params = get_query_params!(req);
+        let q = t_param_default!(params, "q", "");
+
+        let mut docs: Vec<DocFromIndexOuter> = Vec::new();
+        if q != "" {
+            let ttv_index = ext_type!(req, TtvIndex).unwrap().lock().unwrap();
+            docs = ttv_index.query(q).unwrap();
+        }
+
+        web.insert("docs", &docs);
+        web.insert("q", q);
+
+        res_html!("forum/search_result.html", web)
+    }
+
+    pub fn search_query(req: &mut Request) -> SapperResult<Response> {
+        let params = get_form_params!(req);
+        let q = t_param!(params, "q");
+
+        res_redirect!(format!("/search?q={}", q))
+    }
+
+    pub fn makeindex(req: &mut Request) -> SapperResult<Response> {
+        permission_need_be_admin(req)?;
+        let mut ttv_index = ext_type!(req, TtvIndex).unwrap().lock().unwrap();
+
+        let articles = Article::get_all_articles();
+
+        for article in articles {
+            let doc2index = Doc2Index {
+                article_id: article.id.to_string(),
+                created_time: article.created_time.timestamp().to_string(),
+                title: article.title,
+                content: article.raw_content
+            };
+            ttv_index.add_doc(doc2index).unwrap();
+        }
+
+        info!("Make index test finished.");
+
+        res_redirect!("/search")
+    }
+
+    
+
 }
 
 
 impl SapperModule for IndexPage {
     fn before(&self, req: &mut Request) -> SapperResult<()> {
         let (path, _) = req.uri();
-        // if cache is open, retreive it to display
-        if envconfig::get_int_item("CACHE") == 1 {
+        if check_cache_switch(req) {
             if &path == "/" {
                 if cache::cache_is_valid("index", "index") {
                     let cache_content = cache::cache_get("index", "index");
@@ -84,6 +136,12 @@ impl SapperModule for IndexPage {
     fn router(&self, router: &mut SapperRouter) -> SapperResult<()> {
         router.get("/", Self::index);
         router.get("/rss", Self::rss_xml);
+        router.get("/search", Self::search_query_page);
+        router.post("/search", Self::search_query);
+
+        // need to be limited call by admin only
+        router.get("/makeindex", Self::makeindex);
+
 
         Ok(())
     }

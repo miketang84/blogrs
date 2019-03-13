@@ -16,7 +16,8 @@ use crate::envconfig;
 use sapper_std::res_html;
 use crate::{
     AppWebContext,
-    AppUser
+    AppUser,
+    TtvIndex,
 };
 
 use crate::dataservice::article::{
@@ -28,13 +29,22 @@ use crate::dataservice::section::Section;
 use crate::dataservice::user::Ruser;
 
 use crate::util::markdown_render;
-use crate::middleware::permission_need_login;
+use crate::middleware::{
+    permission_need_login,
+    permission_need_be_admin,
+    check_cache_switch
+};
 
 struct CommentPaginator {
     total_comments: i32,
     total_page: i32,
     current_page: i32
 }
+
+use crate::tantivy_index::{
+    TantivyIndex,
+    Doc2Index,
+};
 
 pub struct ArticlePage;
 
@@ -89,6 +99,13 @@ impl ArticlePage {
         web.insert("article", &article);
 
         res_html!("forum/delete_article.html", web)
+    }
+
+    pub fn article_path_page(req: &mut Request) -> SapperResult<Response> {
+        let params = get_path_params!(req);
+        let id = t_param_parse!(params, "id", Uuid);
+
+        res_redirect!(format!("/article?id={}", id))
     }
     
     pub fn article_detail_page(req: &mut Request) -> SapperResult<Response> {
@@ -176,6 +193,16 @@ impl ArticlePage {
 
         match article_create.insert() {
             Ok(article) => {
+                // add to tantivy index
+                let mut ttv_index = ext_type!(req, TtvIndex).unwrap().lock().unwrap();
+                let doc2index = Doc2Index {
+                    article_id: article.id.to_string(),
+                    created_time: article.created_time.timestamp().to_string(),
+                    title: article.title,
+                    content: article.raw_content
+                };
+                ttv_index.add_doc(doc2index).unwrap();
+
                 res_redirect!(format!("/article?id={}", article.id))
             },
             Err(_) => {
@@ -206,6 +233,14 @@ impl ArticlePage {
 
         match article_edit.update() {
             Ok(article) => {
+                let mut ttv_index = ext_type!(req, TtvIndex).unwrap().lock().unwrap();
+                let doc2index = Doc2Index {
+                    article_id: article.id.to_string(),
+                    created_time: article.created_time.timestamp().to_string(),
+                    title: article.title,
+                    content: article.raw_content
+                };
+                ttv_index.update_doc(doc2index).unwrap();
                 res_redirect!(format!("/article?id={}", article.id))
             },
             Err(_) => {
@@ -221,6 +256,8 @@ impl ArticlePage {
 
         match Article::delete_by_id(article_id) {
             Ok(article) => {
+                let mut ttv_index = ext_type!(req, TtvIndex).unwrap().lock().unwrap();
+                let _ = ttv_index.delete_doc(&article.id.to_string());
                 res_redirect!(format!("/section?id={}", section_id))
             },
             Err(_) => {
@@ -229,7 +266,15 @@ impl ArticlePage {
         }  
     }
 
+    pub fn article_delete_index(req: &mut Request) -> SapperResult<Response> {
+        permission_need_be_admin(req)?;
+        let params = get_query_params!(req);
+        let article_id = t_param_parse!(params, "article_id", Uuid);
 
+        let mut ttv_index = ext_type!(req, TtvIndex).unwrap().lock().unwrap();
+        let _ = ttv_index.delete_doc(&article_id.to_string());
+        res_redirect!("/")
+    }
 
     // Blog Area
     pub fn blog_article_create_page(req: &mut Request) -> SapperResult<Response> {
@@ -332,9 +377,8 @@ impl ArticlePage {
 
 impl SapperModule for ArticlePage {
     fn before(&self, req: &mut Request) -> SapperResult<()> {
-
-        let (path, _) = req.uri();
-        if envconfig::get_int_item("CACHE") == 1 {
+        if check_cache_switch(req) {
+            let (path, _) = req.uri();
             if &path == "/article" {
                 let params = get_query_params!(req);
                 let article_id = t_param!(params, "id");
@@ -347,89 +391,80 @@ impl SapperModule for ArticlePage {
             }
         }
 
-        match permission_need_login(req) {
-            Ok(_) => {
-                // pass, nothing need to do here
-            },
-            Err(info) => {
-                return Err(SapperError::Custom("no permission".to_string()));
-            }
-        }
+        permission_need_login(req)?;
 
         Ok(())
     }
 
     fn after(&self, req: &Request, res: &mut Response) -> SapperResult<()> {
-        let res_status = res.status();
-        if res_status == status::Ok || res_status == status::Found {
-            let (path, _) = req.uri();
-            if &path == "/s/article/create" 
-                || &path == "/s/article/edit" 
-                || &path == "/s/article/delete" 
-                || &path == "/s/blogarticle/create" 
-                || &path == "/s/blogarticle/edit" {
-            
-                cache::cache_set_invalid("index", "index");
-            }
-
-            // check other urls
-            if &path == "/s/article/create" 
-                || &path == "/s/article/edit"
-                || &path == "/s/article/delete" {
-                
-                let params = get_form_params!(req);
-                let section_id = t_param_parse!(params, "section_id", Uuid);
-
-                let napp = envconfig::get_int_item("NUMBER_ARTICLE_PER_PAGE");
-                let n = Section::get_articles_count_belong_to_this(section_id);
-                let total_page = ((n -1) / napp) as i64 + 1;
-
-                for i in 1..=total_page {
-                    let part_key = section_id.to_string() + ":" + &i.to_string();
-                    cache::cache_set_invalid("section", &part_key);
-                }
-            }
-
-            if &path == "/s/blogarticle/create" 
-                || &path == "/s/blogarticle/edit" {
-                let user = ext_type!(req, AppUser).unwrap();
-                let section_id = Section::get_by_suser(user.id).unwrap().id;
-
-                let napp = envconfig::get_int_item("NUMBER_ARTICLE_PER_PAGE");
-                let n = Section::get_articles_count_belong_to_this(section_id);
-                let total_page = ((n -1) / napp) as i64 + 1;
-
-                for i in 1..=total_page {
-                    let part_key = section_id.to_string() + ":" + &i.to_string();
-                    cache::cache_set_invalid("section", &part_key);
-                }
-            }
-
-            if &path == "/article" {
-                let params = get_query_params!(req);
-                let article_id = t_param!(params, "id");
-                let current_page = t_param_parse_default!(params, "current_page", i64, 1);
-                let part_key = article_id.to_string() + ":" + &current_page.to_string();
-                if !cache::cache_is_valid("article", &part_key) {
-                    cache::cache_set("article", &part_key, res.body());
-                }
-            }
-
-            if &path == "/s/article/edit" 
-                || &path == "/s/blogarticle/edit"  {
-                let params = get_form_params!(req);
-                let article_id = t_param!(params, "id");
-
-                cache::cache_set_invalid("article", article_id);
-            }
-
+        let (path, _) = req.uri();
+        if &path == "/s/article/create" 
+            || &path == "/s/article/edit" 
+            || &path == "/s/article/delete" 
+            || &path == "/s/blogarticle/create" 
+            || &path == "/s/blogarticle/edit" {
+        
+            cache::cache_set_invalid("index", "index");
         }
+
+        // check other urls
+        if &path == "/s/article/create" 
+            || &path == "/s/article/edit"
+            || &path == "/s/article/delete" {
+            
+            let params = get_form_params!(req);
+            let section_id = t_param_parse!(params, "section_id", Uuid);
+
+            let napp = envconfig::get_int_item("NUMBER_ARTICLE_PER_PAGE");
+            let n = Section::get_articles_count_belong_to_this(section_id);
+            let total_page = ((n -1) / napp) as i64 + 1;
+
+            for i in 1..=total_page {
+                let part_key = section_id.to_string() + ":" + &i.to_string();
+                cache::cache_set_invalid("section", &part_key);
+            }
+        }
+
+        if &path == "/s/blogarticle/create" 
+            || &path == "/s/blogarticle/edit" {
+            let user = ext_type!(req, AppUser).unwrap();
+            let section_id = Section::get_by_suser(user.id).unwrap().id;
+
+            let napp = envconfig::get_int_item("NUMBER_ARTICLE_PER_PAGE");
+            let n = Section::get_articles_count_belong_to_this(section_id);
+            let total_page = ((n -1) / napp) as i64 + 1;
+
+            for i in 1..=total_page {
+                let part_key = section_id.to_string() + ":" + &i.to_string();
+                cache::cache_set_invalid("section", &part_key);
+            }
+        }
+
+        if &path == "/article" {
+            let params = get_query_params!(req);
+            let article_id = t_param!(params, "id");
+            let current_page = t_param_parse_default!(params, "current_page", i64, 1);
+            let part_key = article_id.to_string() + ":" + &current_page.to_string();
+            if !cache::cache_is_valid("article", &part_key) {
+                cache::cache_set("article", &part_key, res.body());
+            }
+        }
+
+        if &path == "/s/article/edit" 
+            || &path == "/s/blogarticle/edit"  {
+            let params = get_form_params!(req);
+            let article_id = t_param!(params, "id");
+
+            cache::cache_set_invalid("article", article_id);
+        }
+
 
         Ok(())
     }
 
     fn router(&self, router: &mut SapperRouter) -> SapperResult<()> {
         router.get("/article", Self::article_detail_page);
+        router.get("/article/:id", Self::article_path_page);
 
         router.get("/p/article/create", Self::article_create_page);
         router.get("/p/article/edit", Self::article_edit_page);
@@ -437,6 +472,7 @@ impl SapperModule for ArticlePage {
         router.post("/s/article/create", Self::article_create);
         router.post("/s/article/edit", Self::article_edit);
         router.post("/s/article/delete", Self::article_delete);
+        router.get("/s/article/delete_index", Self::article_delete_index);
 
         router.get("/p/blogarticle/create", Self::blog_article_create_page);
         router.get("/p/blogarticle/edit", Self::blog_article_edit_page);

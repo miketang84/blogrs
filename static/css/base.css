@@ -1,6 +1,6 @@
 body {
 	color: #222;
-	max-width: 800px;
+	max-width: 720px;
 	margin: auto;
 	padding: 0;
 }
@@ -36,13 +36,13 @@ pre {
 }
 
 pre code {
-	font-size: 14px;
+	font-size: 15px;
 }
 
 div code,
 p code,
 ul code {
-	background: pink;
+	background: #eef;
 }
 
 .right {
@@ -145,6 +145,15 @@ ul code {
 	list-style-type: disc;
 }
 
+.detail-body a:link, .comment-content a:link {
+	color: blue;
+}
+
+.detail-body a:visited, .comment-content a:visited  {
+	color: purple;
+}
+
+
 
 .vice-title {
 	font-size: 14px;
@@ -176,8 +185,15 @@ ul code {
 	margin-bottom: 4px;
 }
 
+.article-list li a.title:link {
+	color: blue;
+}
+.article-list li a.title:visited {
+	color: purple;
+}
+
+
 .article-list li .title {
-	max-width: 75%;
     display: inline-block;
     text-overflow: ellipsis;
     overflow: hidden;
@@ -278,9 +294,11 @@ ul code {
 }
 
 .comments .item .comment-content pre {
-	font-size: 12px;
-	line-height: 22px;
-	margin: 0;
+	font-size: 14px;
+	line-height: 16px;
+	margin: 8px 0 0 0;
+	padding: 8px;
+	overflow: hidden;
 }
 
 .new-reply {
@@ -294,4 +312,44 @@ ul code {
 
 .current_page {
 	text-decoration-line: underline;
+}
+
+.search_results .caption {
+	line-height: 40px;
+	font-size: 16px;
+}
+
+.search_results .item {
+	line-height: 32px;
+	font-size: 16px;
+	padding-left: 20px;
+}
+
+.search_form .input {
+	line-height: 40px;
+}
+
+.search_form .submit {
+	height: 32px;
+}
+
+.search_results a:link {
+	color: blue;
+}
+
+.search_results a:visited {
+	color: purple;
+}
+
+.search_results .timestamp {
+	font-size: 14px;
+}
+
+
+a.linked:link {
+	color: blue;
+}
+
+a.linked:visited {
+	color: purple;
 }

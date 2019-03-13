@@ -188,39 +188,29 @@ impl CommentPage {
 
 impl SapperModule for CommentPage {
     fn before(&self, req: &mut Request) -> SapperResult<()> {
-        match permission_need_login(req) {
-            Ok(_) => {
-                // pass, nothing need to do here
-            },
-            Err(info) => {
-                return Err(SapperError::Custom("no permission".to_string()));
-            }
-        }
+        permission_need_login(req)?;
 
         Ok(())
     }
 
     fn after(&self, req: &Request, res: &mut Response) -> SapperResult<()> {
-        let res_status = res.status();
-        if res_status == status::Ok || res_status == status::Found {
-            let (path, _) = req.uri();
-            if &path == "/s/comment/new"
-                || &path == "/s/comment/edit"
-                || &path == "/s/comment/delete" {
-                
-                let params = get_form_params!(req);
-                let article_id = t_param_parse!(params, "article_id", Uuid);
+        let (path, _) = req.uri();
+        if &path == "/s/comment/new"
+            || &path == "/s/comment/edit"
+            || &path == "/s/comment/delete" {
+            
+            let params = get_form_params!(req);
+            let article_id = t_param_parse!(params, "article_id", Uuid);
 
-                let ncpp = envconfig::get_int_item("NUMBER_COMMENT_PER_PAGE");
-                let n = Article::get_comments_count_belong_to_this(article_id);
-                let total_page = ((n -1) / ncpp) as i64 + 1;
+            let ncpp = envconfig::get_int_item("NUMBER_COMMENT_PER_PAGE");
+            let n = Article::get_comments_count_belong_to_this(article_id);
+            let total_page = ((n -1) / ncpp) as i64 + 1;
 
-                for i in 1..=total_page {
-                    let part_key = article_id.to_string() + ":" + &i.to_string();
-                    cache::cache_set_invalid("article", &part_key);
-                }
-                
+            for i in 1..=total_page {
+                let part_key = article_id.to_string() + ":" + &i.to_string();
+                cache::cache_set_invalid("article", &part_key);
             }
+            
         }
 
         Ok(())
