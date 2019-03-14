@@ -16,7 +16,6 @@ p, ul {
 }
 
 ul li {
-	height: 24px;
 	line-height: 24px;
 	list-style-type: none;
 	text-overflow: ellipsis;
@@ -122,8 +121,9 @@ small {
 	padding: 20px 0px;
 }
 
-.detail-body p {
+.detail-body p, .comments p {
 	line-height: 24px;
+	padding: 7px 0;
 }
 
 
@@ -147,6 +147,8 @@ small {
 
 .detail-body ul li {
 	list-style-type: disc;
+	overflow: inherit;
+	white-space: inherit;
 }
 
 .detail-body a:link, .comment-content a:link {
@@ -183,10 +185,6 @@ small {
 	margin-top: 10px;
 	margin-bottom: 24px;
 	font-size: 16px;
-}
-
-.article-list li {
-	margin-bottom: 4px;
 }
 
 .article-list li a.title:link {
@@ -281,7 +279,7 @@ small {
 }
 
 .comments .item {
-	line-height: 32px;
+	line-height: 24px;
 	padding: 5px 0;
 }
 
